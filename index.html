@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>タップRPG 完全版</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+body{background:#111;color:#fff;font-family:sans-serif;text-align:center;margin:0;padding:15px}
+button{font-size:16px;padding:12px 20px;margin:4px}
+#tapBtn{font-size:26px;padding:28px 60px}
+.hidden{display:none!important}
+.boss{font-size:80px}
+.hp-bar{width:80%;height:18px;background:#333;margin:10px auto;border-radius:10px}
+.hp{height:100%;background:red}
+.overlay{
+ position:fixed;inset:0;background:rgba(0,0,0,.9);
+ display:flex;justify-content:center;align-items:center;
+ font-size:20px;z-index:999;text-align:center;padding:20px;overflow:auto
+}
+.spin{font-size:80px;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* 図鑑（横並び） */
+.dex-grid{
+ display:flex;
+ flex-wrap:wrap;
+ gap:10px;
+ justify-content:center;
+}
+.dex-item{
+ background:#222;
+ padding:10px;
+ border-radius:8px;
+ min-width:120px;
+}
+</style>
+</head>
+<body>
+
+<h1>🔥 タップRPG 🔥</h1>
+<p>💰 <span id="coin"></span> / 💎 <span id="dia"></span></p>
+<p>⚔ 攻撃力 +<span id="atk"></span></p>
+
+<button onclick="drawGacha()">🎰</button>
+<button onclick="drawGacha10()">🎰10</button>
+<button onclick="drawDiaGacha()">💎</button>
+<button onclick="drawDiaGacha10()">💎10</button>
+<button onclick="showDex()">📖 図鑑</button>
+
+<hr>
+
+<button id="rushBtn" onclick="startRush()">🔥 ボスラッシュ 🔥</button>
+
+<div id="select">
+  <button onclick="startBattle('スライム',100,'🟢',10)">スライム</button>
+  <button onclick="startBattle('オーク',300,'👹',20)">オーク</button>
+  <button onclick="startBattle('ドラゴン',800,'🐉',50)">ドラゴン</button>
+  <button onclick="startBattle('神竜',5000,'🐲✨',500)">神竜</button>
+</div>
+
+<div id="game" class="hidden">
+  <h2 id="bossName"></h2>
+  <div class="boss" id="bossIcon"></div>
+  <div class="hp-bar"><div class="hp" id="hp"></div></div>
+  <p>HP <span id="hpText"></span></p>
+  <button id="tapBtn">攻撃</button>
+</div>
+
+<div id="overlay" class="overlay hidden"></div>
+
+<script>
+/* ===== 保存データ ===== */
+let coin=+localStorage.getItem("coin")||0;
+let dia=+localStorage.getItem("dia")||0;
+let atk=+localStorage.getItem("atk")||0;
+let dex=JSON.parse(localStorage.getItem("dex")||"{}");
+
+const coinEl=document.getElementById("coin");
+const diaEl=document.getElementById("dia");
+const atkEl=document.getElementById("atk");
+const overlay=document.getElementById("overlay");
+
+function save(){
+ localStorage.setItem("coin",coin);
+ localStorage.setItem("dia",dia);
+ localStorage.setItem("atk",atk);
+ localStorage.setItem("dex",JSON.stringify(dex));
+ coinEl.textContent=coin;
+ diaEl.textContent=dia;
+ atkEl.textContent=atk.toFixed(1);
+}
+save();
+
+/* ===== overlay ===== */
+function show(html,time=3000){
+ overlay.innerHTML=html;
+ overlay.classList.remove("hidden");
+ if(time) setTimeout(()=>overlay.classList.add("hidden"),time);
+}
+
+/* ===== 演出 ===== */
+function anim(cb){
+ show('<div class="spin">🎰</div>',null);
+ setTimeout(()=>{overlay.classList.add("hidden");cb();},1200);
+}
+
+/* ===== ガチャ ===== */
+function normalRoll(){
+ const r=Math.random()*100;
+ if(r<2)return["LR",1.5];
+ if(r<7)return["UR",1];
+ if(r<22)return["HR",0.5];
+ return["R",0.1];
+}
+
+function drawGacha(){
+ if(coin<100)return show("コイン不足");
+ coin-=100; save();
+ anim(()=>{
+  const g=normalRoll();
+  atk+=g[1];
+  dex[g[0]]=(dex[g[0]]||0)+1;
+  save();
+  show(`${g[0]} +${g[1]}`);
+ });
+}
+
+function drawGacha10(){
+ if(coin<1000)return show("コイン不足");
+ coin-=1000; save();
+ anim(()=>{
+  let html="<h3>🎰10連結果</h3>";
+  for(let i=0;i<10;i++){
+   const g=normalRoll();
+   atk+=g[1];
+   dex[g[0]]=(dex[g[0]]||0)+1;
+   html+=`<div>${i+1}. ${g[0]} +${g[1]}</div>`;
+  }
+  save();
+  show(html,4500);
+ });
+}
+
+/* ===== ダイヤガチャ ===== */
+function diaRoll(){
+ const r=Math.random()*100;
+ if(r<15)return["DIVINE",10];
+ if(r<60)return["UR",1];
+ return["LR",1.5];
+}
+
+function drawDiaGacha(){
+ if(dia<1)return show("ダイヤ不足");
+ dia--; save();
+ anim(()=>{
+  const g=diaRoll();
+  atk+=g[1];
+  dex[g[0]]=(dex[g[0]]||0)+1;
+  save();
+  show(`💎 ${g[0]} +${g[1]}`);
+ });
+}
+
+function drawDiaGacha10(){
+ if(dia<10)return show("ダイヤ不足");
+ dia-=10; save();
+ anim(()=>{
+  let html="<h3>💎10連結果</h3>";
+  for(let i=0;i<10;i++){
+   const g=diaRoll();
+   atk+=g[1];
+   dex[g[0]]=(dex[g[0]]||0)+1;
+   html+=`<div>${i+1}. ${g[0]} +${g[1]}</div>`;
+  }
+  save();
+  show(html,5000);
+ });
+}
+
+/* ===== 図鑑 ===== */
+function showDex(){
+ let h="<h2>📖 図鑑</h2><div class='dex-grid'>";
+ for(let k in dex){
+  h+=`<div class="dex-item">${k}<br>×${dex[k]}</div>`;
+ }
+ h+="</div>";
+ show(h,4000);
+}
+
+/* ===== バトル ===== */
+let bossHp,maxHp,reward,startTime;
+function startBattle(n,h,i,r){
+ rushMode=false;
+ document.getElementById("rushBtn").classList.remove("hidden");
+ document.getElementById("select").classList.add("hidden");
+ document.getElementById("game").classList.remove("hidden");
+ bossName.textContent=n;
+ bossIcon.textContent=i;
+ bossHp=maxHp=h;
+ reward=r;
+ startTime=Date.now();
+ updateHp();
+}
+
+function updateHp(){
+ hpText.textContent=Math.ceil(bossHp);
+ hp.style.width=(bossHp/maxHp*100)+"%";
+}
+
+tapBtn.onclick=()=>{
+ bossHp-=1+atk;
+ updateHp();
+ if(bossHp<=0){
+  coin+=reward;
+  save();
+  game.classList.add("hidden");
+  select.classList.remove("hidden");
+  show(`🎉 撃破！<br>💰 +${reward}`);
+ }
+};
+
+/* ===== ボスラッシュ ===== */
+let rushMode=false;
+let rushEnd=0;
+let rushCount=0;
+
+const rushBosses=[
+ ["スライム",200,"🟢",50],
+ ["オーク",600,"👹",120],
+ ["ドラゴン",2000,"🐉",300],
+ ["神竜",10000,"🐲",1000]
+];
+
+function startRush(){
+ rushMode=true;
+ rushCount=0;
+ rushEnd=Date.now()+60000;
+ rushBtn.classList.add("hidden");
+ select.classList.add("hidden");
+ nextRushBoss();
+ rushTick();
+}
+
+function nextRushBoss(){
+ const b=rushBosses[Math.floor(Math.random()*rushBosses.length)];
+ startBattle(b[0],b[1],b[2],b[3]);
+}
+
+function rushTick(){
+ if(!rushMode)return;
+ if(Date.now()>rushEnd){
+  rushMode=false;
+  coin+=rushCount*1000;
+  save();
+  show(`🔥 ボスラッシュ終了<br>${rushCount}体撃破<br>💰 +${rushCount*1000}`,4000);
+  select.classList.remove("hidden");
+  rushBtn.classList.remove("hidden");
+  game.classList.add("hidden");
+  return;
+ }
+ setTimeout(rushTick,500);
+}
+</script>
+</body>
+</html>
